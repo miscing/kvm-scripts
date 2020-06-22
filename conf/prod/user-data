@@ -1,0 +1,18 @@
+#cloud-config
+users:
+  - name: exampleuser
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    ssh_authorized_keys:
+      - ROAIJDSIOASNDAUISDHLASD something@hello
+packages:
+  - tmux
+  - podman
+  - PackageKit
+  - cockpit-bridge
+  - cockpit-bridge
+  - cockpit-packagekit
+  - cockpit-podman
+  - cockpit-storaged
+  - cockpit-system
+  - cockpit-ws
+  - openssh-server

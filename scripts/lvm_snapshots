@@ -1,0 +1,78 @@
+#!/bin/bash
+
+# Configuration options
+lvmbackuplist='/etc/kvm-scripts/to_snapshot'
+number_of_snapshots_to_keep=10
+
+# Shouldn't require changing
+logs='/var/log/autosnapshots.logs'
+snapshotlist='/tmp/tmp_tosnapshot'
+
+function logError {
+	if [[ -n '$1'  ]]; then
+		echo "$(date) $1" >> $logs
+	fi
+}
+
+function logFatal {
+	logError "$1"
+	rm $snapshotlist 2> /dev/null
+	exit 2
+}
+
+# slight sanity checks
+if [[ ! -w $lvmbackuplist ]]; then
+	logFatal "backup list missing, please create $lvmbackuplist"
+fi
+
+#Loop through lvmbackuplist and create snapshots of all contained lvm's
+while IFS=' ' read sourcelvm || [[ -n "$sourcelvm" ]]; do
+
+	currenttime=$(date +"%Y-%m-%d-%H-%M")
+	lv_name=$(echo $sourcelvm | cut -d '/' -f 2)
+	vg_name=$(echo $sourcelvm | cut -d '/' -f 1)
+	fullname=$sourcelvm'-'$currenttime
+
+	if [[ -z "$sourcelvm" ]]; then
+		continue
+	fi #Check if empty
+
+	if [[ $(lvm lvs --noheadings -o lv_device_open $vg_name'/'$lv_name|tr -d ' ') != 'open' ]]; then
+		continue
+	fi # Check if origin lvm is open. If not, skip snapshot
+
+	lvm lvcreate -n $fullname -s $sourcelvm </dev/null
+	if [[ $? != 0 ]]; then
+		logError "failed to create snapshot"
+		continue
+	fi 
+
+	# Create temporary file with list of snapshots
+	lvm lvs |grep ''$lv_name'-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}-[0-9]\{2\}'|awk '{print $1}' >> $snapshotlist
+	if [ ! -s $snapshotlist ]; then
+		rm $snapshotlist
+		continue
+	fi #Check that file is non-empty
+
+	#number_of_backup_snapshots=$(cat $snapshotlist |grep $lv_name |wc -l )
+	while [[ $(cat $snapshotlist |grep $lv_name |wc -l)  -gt $number_of_snapshots_to_keep ]]; do
+		sort $snapshotlist -o $snapshotlist</dev/null
+		oldest=$(grep -m 1 $lv_name $snapshotlist)
+		#delete actual snapshot
+		lvm lvremove $vg_name'/'$oldest </dev/null
+		if [[ $? != 0 ]]; then
+			logFatal "failed to remove backup snapshot"
+		fi 
+
+		#delete line from snapshotlist
+		sed -i "\:$oldest:d" $snapshotlist
+		if [[ $? != 0 ]]; then
+			logFatal "Failed to delete entry from file."
+		fi
+	done
+
+	rm $snapshotlist
+	if [[ -a $snapshotlist ]]; then
+		logFatal "Failed to delete temp file, non-critical but script stopped."
+	fi
+done < $lvmbackuplist
