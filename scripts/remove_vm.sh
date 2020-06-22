@@ -28,4 +28,4 @@ if [[ -n $(grep $vm_name /etc/hosts 2>/dev/null) ]]; then
 fi
 
 echo vm removed
-echo remove lvm manually
+echo remember to remove lvm manually!
