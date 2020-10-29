@@ -97,4 +97,6 @@ if ! echo -e "$ipaddr\t$newvm" >> /etc/hosts; then
 fi
 echo added mapping to /etc/hosts
 
+systemctl restart dnsmasq
+
 cleanup_exit 0

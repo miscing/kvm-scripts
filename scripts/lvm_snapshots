@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Configuration options
+#Filepath to use as list of lvm's to keep 
 lvmbackuplist='/etc/kvm-scripts/to_snapshot'
 number_of_snapshots_to_keep=10
 
