@@ -23,25 +23,19 @@ else
 	NET_NAME="prod"
 fi
 
+IGNITION_CONFIG="/var/lib/libvirt/images/${VM_NAME}.ign"
+IMAGE="/var/lib/libvirt/images/fedora-coreos.x86_64.qcow2"
+
 function cleanup {
-	rm ignition.ign
-	test -f /var/lib/libvirt/images/ignition.ign && rm /var/lib/libvirt/images/ignition.ign
+	test -f $IGNITION_CONFIG && rm $IGNITION_CONFIG
 }
 
-if ! jq --arg vm "data,$VM_NAME" '.storage.files[0].contents.source = $vm' ignition.ign.template > ignition.ign; then
+if ! jq --arg vm "data:,$VM_NAME" '.storage.files[0].contents.source = $vm' ignition.ign > $IGNITION_CONFIG; then
 	echo "Failed to add hostname to ignition file"
 	cleanup
 	exit 2
 fi
 
-if ! cp ./ignition.ign /var/lib/libvirt/images/ignition.ign; then
-	echo failed to copy ignition file
-	cleanup
-	exit 3
-fi
-
-IGNITION_CONFIG="/var/lib/libvirt/images/ignition.ign"
-IMAGE="/var/lib/libvirt/images/fedora-coreos.x86_64.qcow2"
 echo "using ignition file: ${IGNITION_CONFIG}"
 
 # stats
@@ -56,8 +50,7 @@ if ! virt-install --connect qemu:///system -n "${VM_NAME}" -r "${RAM_MB}" --vcpu
 then
 	echo failed to install runner
 	cleanup
-	exit 4
+	exit 3
 fi
 echo $(( $num + 1 )) > .cur_number
-rm /var/lib/libvirt/images/ignition.ign
 echo installed runner succesfully, no dns mapping
