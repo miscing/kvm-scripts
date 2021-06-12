@@ -1,25 +1,4 @@
 #!/bin/bash
-#
-# Copyright 2020 Alexander Saastamoinen
-#
-#  Licensed under the EUPL, Version 1.2 or – as soon they
-# will be approved by the European Commission - subsequent
-# versions of the EUPL (the "Licence");
-#  You may not use this work except in compliance with the
-# Licence.
-#  You may obtain a copy of the Licence at:
-#
-#  https://joinup.ec.europa.eu/collection/eupl/eupl-text-eupl-12
-#
-#  Unless required by applicable law or agreed to in
-# writing, software distributed under the Licence is
-# distributed on an "AS IS" basis,
-#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
-# express or implied.
-#  See the Licence for the specific language governing
-# permissions and limitations under the Licence.
-#
-
 
 USAGE="$0 vm_name vm_name2..."
 
@@ -72,14 +51,33 @@ for vm_name in "$@"; do
 	fi
 	
 	# remove lvm
-	full_line="$(lvs --no-headings -o lv_name,vg_name 2>/dev/null | grep $vm_name )"
-	if [[ -n  $full_line ]]; then
-		echo $full_line
-		vg_name="$(echo $full_line | awk '{print $2}')"
-		if ! lvremove $vg_name"/"$vm_name; then
+	lv_name="$(lvs --reportformat=json -o lv_name,vg_name | jq --arg name $vm_name -r '.report[0].lv[] | select(.lv_name==$name) | .lv_name')"
+	vg_name="$(lvs --reportformat=json -o lv_name,vg_name | jq --arg name $vm_name -r '.report[0].lv[] | select(.lv_name==$name) | .vg_name')"
+	echo $lv_name $vg_name $vm_name
+	if [[ -n $lv_name && -n $vg_name ]];then
+		echo "Delete $vg_name/$lv_name? (y/N)"
+		read response
+		if [[ $response != "y" ]]; then
+			exit 2
+		fi
+		if ! lvremove $vg_name"/"$lv_name; then
 			echo failed to remove lvm
 		fi
-	else
-		echo could not find lvm, remove manually if still there
+	fi
+	# look for snapshots
+	regex="^$vm_name-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}"
+	snaps=$(lvs --reportformat=json -o lv_name,vg_name | jq -r --arg re $regex '.report[0].lv[].lv_name | match($re) | .string')
+	vg_name="$(lvs --reportformat=json -o lv_name,vg_name | jq --arg name $(echo $snaps | awk '{print $1}') -r '.report[0].lv[] | select(.lv_name==$name) | .vg_name')"
+	if [[ -n $snaps ]]; then
+		echo "found snapshots:"
+		echo $snaps
+		echo "Delete? (y/N)"
+		read response
+		if [[ $response != "y" ]]; then
+			exit 2
+		fi
+		echo VG: $vg_name
+		echo LV: $lv_name
+		lvs --reportformat=json -o lv_name,vg_name | jq -r --arg re $regex '.report[0].lv[].lv_name | match($re) | .string' | xargs -l -I '{}' lvremove $vg_name/{}
 	fi
 done

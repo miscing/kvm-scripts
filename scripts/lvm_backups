@@ -1,0 +1,10 @@
+#!/bin/bash
+
+lvmbackuplist="/etc/kvm-scripts/to_backup"
+
+while IFS=' ' read sourcelvm || [[ -n "$sourcelvm" ]]; do
+	lv_name=$(echo $sourcelvm | cut -d '/' -f 2)
+	vg_name=$(echo $sourcelvm | cut -d '/' -f 1)
+	regex="^$lv_name-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}"
+	snapshots=$(lvs --reportformat=json -o lv_name,vg_name | jq -r --arg re $regex '.report[0].lv[].lv_name | match($re) | .string')
+done < $lvmbackuplist
