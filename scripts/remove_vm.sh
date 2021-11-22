@@ -3,7 +3,7 @@
 USAGE="$0 vm_name vm_name2..."
 
 for vm_name in "$@"; do 
-	if [[ ! $vm_name =~ ^[[:alnum:]]*$ ]]; then
+	if [[ ! $vm_name =~ ^[\-0-9A-Za-z]*$ ]]; then
 		echo arguments must be alphanumeric, invalid arg: $vm_name
 		echo -e $USAGE
 		exit 1
